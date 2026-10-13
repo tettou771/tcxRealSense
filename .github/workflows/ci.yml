@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['**']   # every branch: a push never silently skips CI. Narrow to [main] if CI is too heavy for this addon.
+    tags: ['v*']
+  pull_request:
+    branches: [main]   # mainly to cover fork PRs into main (your own branches already run via push)
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+jobs:
+  # Builds tcxRealSense + example-basic on the platforms in addon.json (Windows
+  # for v1). Compile/link only: running needs a real camera, so there is no
+  # tests/ dir. setup_script installs the RealSense SDK and points the addon's
+  # CMake at it with REALSENSE_SDK_DIR (the Windows SDK has no CMake config).
+  build:
+    uses: TrussC-org/ci-actions/.github/workflows/build-addon.yml@v1
+    with:
+      setup_script: |
+        set -euo pipefail
+        SDK_TAG="v2.59.1"
+        SDK_EXE="RealSense.SDK-WIN10-2.59.1.11053.exe"
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          url="https://github.com/realsenseai/librealsense/releases/download/${SDK_TAG}/${SDK_EXE}"
+          echo "RealSense SDK: $url"
+          curl -fsSL -o "$RUNNER_TEMP/rs-sdk.exe" "$url"
+          # Inno Setup installer: silent, into a fixed folder. Start-Process
+          # -Wait keeps the step until setup has finished copying files.
+          pwsh -NoProfile -Command "Start-Process -Wait -FilePath '$RUNNER_TEMP\\rs-sdk.exe' -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/DIR=C:\\rs-sdk'"
+          test -f "/c/rs-sdk/include/librealsense2/rs.hpp"
+          test -f "/c/rs-sdk/lib/x64/realsense2.lib"
+          test -f "/c/rs-sdk/bin/x64/realsense2.dll"
+          echo "REALSENSE_SDK_DIR=C:/rs-sdk" >> "$GITHUB_ENV"
+        fi
