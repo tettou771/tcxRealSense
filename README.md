@@ -5,10 +5,12 @@ implementing the [`tcxDepthCamera`](https://github.com/TrussC-org/TrussC/tree/ma
 interface. First target: **D435**. Other D4xx stereo cameras should work but are
 untested.
 
-> **Status: Windows-first v1, awaiting hardware verification.** Backend and
-> example pass C++20 syntax checks against librealsense v2.59.1 headers. Linux
-> CMake wiring exists, but a real Linux SDK build and camera run are unverified;
-> Linux is not advertised in `addon.json`. See `TODO.md`.
+> **Status: Windows v1, hardware-verified** on a D435 (firmware 5.17.0.10,
+> USB 3.2) with RealSense SDK v2.59.1: `example-basic` streams depth, color, IR
+> and a colored point cloud at 30 fps, and the lifecycle checklist (re-setup,
+> unplug / replug, exit through the destructor, a second process) passes. Linux
+> CMake wiring exists but is unverified; Linux is not advertised in
+> `addon.json`. See `TODO.md`.
 
 ## Requirements
 
@@ -22,11 +24,15 @@ untested.
 ### Windows
 
 Install SDK 2.0 from the
-[librealsense releases](https://github.com/IntelRealSense/librealsense/releases).
+[librealsense releases](https://github.com/realsenseai/librealsense/releases)
+(the project moved from IntelRealSense/librealsense; the v2.59.1 installer is
+`RealSense.SDK-WIN10-2.59.1.11053.exe`).
 The Windows installer ships **no CMake package config**. This addon searches:
 
-1. `-DREALSENSE_SDK_DIR="<sdk>"`, if supplied (always wins).
-2. `%USERPROFILE%\Documents\RealSense SDK 2.0`.
+1. `-DREALSENSE_SDK_DIR="<sdk>"`, if supplied (always wins), else a
+   `REALSENSE_SDK_DIR` environment variable.
+2. `%USERPROFILE%\Documents\RealSense SDK 2.0` (the v2.59 installer's per-user
+   default).
 3. `C:\Program Files (x86)\Intel RealSense SDK 2.0`.
 
 The selected SDK must contain `include/librealsense2/rs.hpp`,
@@ -81,11 +87,15 @@ sets native color resolution; `setDesiredFrameRate(fps)` applies to all enabled
 streams. Defaults are **848×480 depth Z16**, **1280×720 color RGBA8**, and
 **848×480 left IR Y8 (stream index 1)**, all **30 fps**. Stream enables are all
 off by default. An unsupported combination fails `setup()` with one Error
-listing the device's supported profiles, without substituting another mode.
+listing the device's modes for the requested streams (resolution and frame
+rates, e.g. `848x480 @ 90/60/30/15/6`), without substituting another mode.
 `setSerial("")` restores index selection.
 
 `getDeviceName()`, `getSerial()` and `getFirmwareVersion()` report SDK device
 information after setup; closing clears it. `getSensorType()` returns `Stereo`.
+After a failed `setup()`, `getLastError()` holds the reason (no device, an
+unknown serial, `Device or resource busy` when another process has the camera,
+an unsupported combination); a successful `setup()` clears it.
 
 ## Example controls
 

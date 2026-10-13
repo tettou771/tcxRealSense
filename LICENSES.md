@@ -8,7 +8,7 @@ MIT License — © tettou771
 
 - **Intel RealSense SDK 2.0 (librealsense)** — Apache License 2.0, © Intel
   Corporation. Must be installed separately.
-  https://github.com/IntelRealSense/librealsense
+  https://github.com/realsenseai/librealsense (moved from IntelRealSense/librealsense)
   The SDK source, headers, import libraries, tools and installer are not
   redistributed in this addon. Only its runtime **realsense2.dll** is bundled
   next to a Windows app executable at build time, from the user's SDK install.

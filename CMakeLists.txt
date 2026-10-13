@@ -24,9 +24,14 @@ target_include_directories(${ADDON_NAME} PUBLIC
     "${_TC_DEPTHCAMERA_SRC}")
 target_link_libraries(${ADDON_NAME} PUBLIC TrussC)
 
+# -DREALSENSE_SDK_DIR wins; the environment variable of the same name (CI,
+# shells) is the fallback.
+if(NOT REALSENSE_SDK_DIR AND DEFINED ENV{REALSENSE_SDK_DIR})
+    set(REALSENSE_SDK_DIR "$ENV{REALSENSE_SDK_DIR}")
+endif()
 set(REALSENSE_SDK_DIR "${REALSENSE_SDK_DIR}" CACHE PATH "Intel RealSense SDK 2.0 root")
 set(_TCRS_TARGET "")
-set(_TCRS_DOWNLOAD "https://github.com/IntelRealSense/librealsense/releases")
+set(_TCRS_DOWNLOAD "https://github.com/realsenseai/librealsense/releases")
 
 if(WIN32)
     # An explicit SDK root wins, even if incomplete: report the error rather
