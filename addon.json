@@ -1,0 +1,21 @@
+{
+  "description": "Intel RealSense D435 backend for tcxDepthCamera — depth, color, IR, point cloud",
+  "author": "tettou771",
+  "license": "MIT",
+  "category": "hardware",
+  "keywords": [
+    "realsense",
+    "d435",
+    "depth",
+    "depthcamera",
+    "pointcloud",
+    "stereo",
+    "rgbd"
+  ],
+  "platforms": [
+    "windows"
+  ],
+  "dependencies": [
+    "tcxDepthCamera"
+  ]
+}
