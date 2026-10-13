@@ -108,8 +108,10 @@ void tcApp::draw() {
         hud += view.getOrtho() ? "  [ortho]" : "  [persp]";
         hud += "\nC: color    O: ortho/persp    1-4: decimation    drag: orbit\nR: setup again    X: close + setup";
     } else {
-        hud  = "No RealSense device found.\n";
-        hud += "Connect the camera, install the RealSense SDK 2.0, then press R to retry.";
+        // getLastError() says why: no device, busy (another app has it), an
+        // unsupported size/fps, ...
+        hud  = "RealSense not available: " + camera->getLastError() + "\n";
+        hud += "Connect the camera (or close the app using it), then press R to retry.";
     }
     drawBitmapString(hud, 20, 20);
 

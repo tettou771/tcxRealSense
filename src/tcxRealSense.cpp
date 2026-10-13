@@ -6,11 +6,13 @@
 
 #include <librealsense2/rs.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <cstring>
 #include <optional>
 #include <sstream>
 #include <thread>
+#include <vector>
 
 using namespace std;
 using namespace tc;
@@ -60,24 +62,43 @@ static string deviceInfo(const rs2::device& device, rs2_camera_info field) {
     return device.supports(field) ? device.get_info(field) : "";
 }
 
-static string supportedProfiles(const rs2::device& device) {
-    ostringstream out;
-    out << "\nSupported profiles:";
+// The device's modes for one stream in the format this addon requests, one
+// line per resolution with its frame rates ("848x480 @ 90/60/30/15/6"). A D435
+// offers about 250 profiles in all; only the requested stream/format matter.
+static string supportedModes(const rs2::device& device, rs2_stream stream, int index,
+                             rs2_format format, const char* label) {
+    vector<pair<pair<int, int>, vector<int>>> modes;  // (w, h) -> fps, in SDK order
     for (const auto& sensor : device.query_sensors()) {
         for (const auto& profile : sensor.get_stream_profiles()) {
-            out << "\n  " << rs2_stream_to_string(profile.stream_type())
-                << "[" << profile.stream_index() << "] ";
-            if (auto video = profile.as<rs2::video_stream_profile>())
-                out << video.width() << "x" << video.height() << " ";
-            out << rs2_format_to_string(profile.format()) << " @ " << profile.fps();
+            if (profile.stream_type() != stream || profile.format() != format) continue;
+            if (index >= 0 && profile.stream_index() != index) continue;
+            auto video = profile.as<rs2::video_stream_profile>();
+            if (!video) continue;
+            const pair<int, int> size{video.width(), video.height()};
+            auto it = find_if(modes.begin(), modes.end(), [&](const auto& m) { return m.first == size; });
+            if (it == modes.end()) {
+                modes.push_back({size, {}});
+                it = prev(modes.end());
+            }
+            if (find(it->second.begin(), it->second.end(), profile.fps()) == it->second.end())
+                it->second.push_back(profile.fps());
         }
+    }
+    ostringstream out;
+    out << "\n  " << label << ":";
+    if (modes.empty()) out << " none";
+    for (const auto& [size, rates] : modes) {
+        out << "\n    " << size.first << "x" << size.second << " @ ";
+        for (size_t i = 0; i < rates.size(); ++i) out << (i ? "/" : "") << rates[i];
     }
     return out.str();
 }
 
 bool RealSense::openDevice() {
-    string profiles;
+    string profiles;  // appended only when the requested combination is unsupported
+    lastError_.clear();
     auto fail = [&](const string& reason) {
+        lastError_ = reason;
         logError("tcxRealSense") << "openDevice failed: " << reason << profiles;
         closeDevice();
         return false;
@@ -94,13 +115,13 @@ bool RealSense::openDevice() {
             }
             if (!impl_->device) return fail("no device with serial " + requestedSerial_);
         } else {
+            if (devices.size() == 0) return fail("no RealSense device connected");
             if (deviceIndex_ >= devices.size())
                 return fail("device index " + to_string(deviceIndex_) + " out of range (" +
                             to_string(devices.size()) + " device(s))");
             impl_->device = devices[deviceIndex_];
         }
 
-        profiles = supportedProfiles(impl_->device);
         if (!isDepthEnabled() && !isColorEnabled() && !isInfraredEnabled())
             return fail("no streams enabled; call enableDepth(), enableColor() or enableInfrared()");
         // Zero dimensions/fps mean automatic selection in the SDK. Reject them
@@ -129,6 +150,13 @@ bool RealSense::openDevice() {
             if (isColorEnabled()) requested << " color " << colorWidth_ << "x" << colorHeight_ << " RGBA8";
             if (isInfraredEnabled()) requested << " left IR " << depthWidth_ << "x" << depthHeight_ << " Y8";
             requested << " @ " << desiredFrameRate_;
+            profiles = "\nSupported by this device:";
+            if (isDepthEnabled())
+                profiles += supportedModes(impl_->device, RS2_STREAM_DEPTH, -1, RS2_FORMAT_Z16, "depth Z16");
+            if (isColorEnabled())
+                profiles += supportedModes(impl_->device, RS2_STREAM_COLOR, -1, RS2_FORMAT_RGBA8, "color RGBA8");
+            if (isInfraredEnabled())
+                profiles += supportedModes(impl_->device, RS2_STREAM_INFRARED, 1, RS2_FORMAT_Y8, "left IR Y8");
             return fail(requested.str());
         }
         auto active = impl_->pipeline->start(config);

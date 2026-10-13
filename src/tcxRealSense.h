@@ -35,6 +35,11 @@ public:
     const std::string& getDeviceName() const { return deviceName_; }
     const std::string& getSerial() const { return serial_; }
     const std::string& getFirmwareVersion() const { return firmwareVersion_; }
+
+    // Why the last setup() failed (e.g. "Device or resource busy" when another
+    // process holds the camera); empty after a successful setup().
+    const std::string& getLastError() const { return lastError_; }
+
     depthcamera::DepthSensorType getSensorType() const override {
         return depthcamera::DepthSensorType::Stereo;
     }
@@ -50,6 +55,7 @@ private:
     uint32_t deviceIndex_;
     std::string requestedSerial_;
     std::string deviceName_, serial_, firmwareVersion_;
+    std::string lastError_;
     int depthWidth_ = 848, depthHeight_ = 480;
     int colorWidth_ = 1280, colorHeight_ = 720;
     int desiredFrameRate_ = 30;
